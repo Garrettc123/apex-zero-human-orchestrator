@@ -1,0 +1,80 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: quantum-revenue-engine
+  namespace: apex-ai-production
+spec:
+  schedule: "0 */6 * * *"   # every 6 hours
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: revenue-engine
+            image: YOUR_ECR_OR_GHCR/apex-orchestrator:1.0.0-breakthrough
+            command: ["python", "-c"]
+            args:
+              - |
+                import asyncio
+                from orchestrator.revenue_engine import QuantumRevenueEngine
+                async def main():
+                    engine = QuantumRevenueEngine()
+                    result = await engine.run_cycle()
+                    print(result)
+                asyncio.run(main())
+            envFrom:
+            - secretRef:
+                name: apex-secrets
+            env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: apex-secrets
+                  key: database-url
+            - name: STRIPE_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: apex-secrets
+                  key: stripe-secret-key
+          restartPolicy: OnFailure
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: closed-loop-optimizer
+  namespace: apex-ai-production
+spec:
+  schedule: "0 3 */14 * *"   # every 14 days at 03:00
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 5
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: optimizer
+            image: YOUR_ECR_OR_GHCR/apex-orchestrator:1.0.0-breakthrough
+            command: ["python", "-c"]
+            args:
+              - |
+                import asyncio
+                from orchestrator.optimizer import ClosedLoopOptimizer
+                async def main():
+                    opt = ClosedLoopOptimizer()
+                    result = await opt.run_cycle()
+                    print(result)
+                asyncio.run(main())
+            envFrom:
+            - secretRef:
+                name: apex-secrets
+            env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: apex-secrets
+                  key: database-url
+          restartPolicy: OnFailure
